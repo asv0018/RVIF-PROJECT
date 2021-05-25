@@ -1,0 +1,27 @@
+float sensorValue1 = 0;
+
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  int adc;
+  int maxvolt = 0;
+  for(int i=0;i<100;i++){
+    adc = analogRead(A0);
+    if(maxvolt < adc){
+      maxvolt = adc;
+      delayMicroseconds(200);
+    }
+  }
+  maxvolt = maxvolt - 436;
+  Serial.println("The Peak adc value was "+String(maxvolt));
+  int voltagepeaktopeak = (maxvolt)*2;
+  Serial.println("The peak-peak adc value is "+String(voltagepeaktopeak));
+  float volt = float(voltagepeaktopeak)*5/1024;
+  float mapped_voltage = volt*250;
+  float finalvolt = mapped_voltage/sqrt(2);
+  Serial.println("The AC voltage is "+String(finalvolt)+" V");
+  delay(1000);
+   
+}

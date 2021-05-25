@@ -1,0 +1,13 @@
+if(is_delay_execution_successful){
+      previousMillis = millis();
+      is_delay_execution_successful = false;
+      timer_delay(temp_timer_delay);
+      save_data(volt_temp, current_temp, power_temp);
+      }
+      
+    if(timer_delay(temp_timer_delay)){
+      is_delay_execution_successful = true;
+    }else{
+      is_delay_execution_successful = false;
+    }
+

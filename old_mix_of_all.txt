@@ -1,0 +1,258 @@
+#define SELECT_SD 10
+#define SWITCH_IN 5
+#define GPIO_CURRENT_IN A1
+#define GPIO_VOLTAGE_IN A0
+#define GPIO_NETWORK_STATUS_IN_CHECK 8
+
+#define GPIO_SD_EXIST 6
+#define GPIO_PROCESS_STATUS 7
+
+#include <SoftwareSerial.h>
+#include <DS3231.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <SD.h>
+
+RTClib RTC;
+DateTime now;
+File file;
+int adc_voltage_error = 436;
+int current_sensitivity = 66; // use 100 for 20A Module and 66 for 30A Module
+bool is_card_present= false;
+bool is_connected_iot = false;
+SoftwareSerial iot(2,3);
+String filename = "datalog.csv";
+
+//iot delays
+bool push_execution_successful = true;
+unsigned long previousmillis=0;
+
+void setup(){
+  pinMode(GPIO_SD_EXIST,OUTPUT);
+  pinMode(GPIO_PROCESS_STATUS,OUTPUT);
+  pinMode(GPIO_NETWORK_STATUS_IN_CHECK,INPUT);
+  pinMode(SWITCH_IN,INPUT);
+  Serial.begin(9600);
+  iot.begin(115200);
+  
+  pinMode(SELECT_SD, OUTPUT);
+  pinMode(SELECT_SD, HIGH);
+  
+  delay(40);
+  
+  if(!SD.begin(4)){
+    Serial.println(F("CARD FAILED"));
+  }else{
+    is_card_present = true;
+    Serial.println("CARD INISIALISED");
+    if(!SD.exists(filename)){
+    Serial.println("File doesnt exist, creating new");
+    // IF THE FILENAME DOESN'T EXIST, THEN CREATE THE FILE AND PROVIDE THE HEADING
+    file = SD.open(filename, FILE_WRITE);
+    delay(25);
+    if(!file){
+      Serial.print("Error opening");
+      Serial.println(filename);
+    }else{
+    String temp = "DATE TIME STAMP, VOLTAGE (V), CURRENT (A), POWER (W)";
+    file.println(temp);
+    delay(10);
+    file.close();
+    delay(10);
+  }
+}
+
+  }
+  
+}
+unsigned long previousMillis = 0;
+bool is_delay_execution_successful = true;
+
+void loop(){
+  bool temp_switch_state = digitalRead(SWITCH_IN);
+  Serial.println("The state was "+String(temp_switch_state));
+  while(temp_switch_state){
+    temp_switch_state = digitalRead(SWITCH_IN);
+    unsigned long temp_timer_delay = 3000;
+    subfunctions();
+    float volt_temp = measureVoltage();
+    float current_temp = measureCurrent();
+    float power_temp = powerCalculation(volt_temp, current_temp);
+    Serial.println("Voltage: "+String(volt_temp)+" Current:"+String(current_temp)+" power:"+String(power_temp));
+
+    if(is_delay_execution_successful){
+      previousMillis = millis();
+      is_delay_execution_successful = false;
+      timer_delay(temp_timer_delay);
+      save_data(volt_temp, current_temp, power_temp);
+      }
+      
+    if(timer_delay(temp_timer_delay)){
+      is_delay_execution_successful = true;
+    }else{
+      is_delay_execution_successful = false;
+    }
+
+  }
+  subfunctions();
+}
+
+void subfunctions(){
+  if(digitalRead(GPIO_NETWORK_STATUS_IN_CHECK)){
+    is_connected_iot = true;
+  }else{
+    is_connected_iot = false;
+  }
+  if(is_card_present){
+    digitalWrite(GPIO_SD_EXIST,HIGH);
+  }else{
+    digitalWrite(GPIO_SD_EXIST,LOW);
+  }
+}
+
+bool timer_delay(unsigned long delay_time){
+  unsigned long currentMillis = millis();
+  if(currentMillis - previousMillis >= delay_time){
+    previousMillis = currentMillis;
+    return true;
+  }
+  return false;
+}
+
+float measureVoltage(){
+  int adc;
+  int maxvolt = 0;
+  for(int i=0;i<100;i++){
+    adc = analogRead(GPIO_VOLTAGE_IN);
+    if(maxvolt < adc){
+      maxvolt = adc;
+      delayMicroseconds(200);
+    }
+  }
+  maxvolt = maxvolt - adc_voltage_error;
+  int voltagepeaktopeak = (maxvolt)*2;
+  float volt = float(voltagepeaktopeak)*5/1024;
+  float mapped_voltage = volt*250;
+  float finalvolt = mapped_voltage/sqrt(2);
+  if(finalvolt>300 || finalvolt < 0){
+    return 0;
+  }else{
+    return finalvolt;
+  }
+}
+
+float measureCurrent(){
+  float adcvalue= 0;
+  int offsetvalue = 448;
+  float Voltage = 0; //voltage measuring
+  float ecurrent = 0;// Current measuring
+  unsigned int temp=0;
+ float maxpoint = 0;
+ int i=0;
+ for(i=0;i<500;i++){
+ if(temp = analogRead(GPIO_CURRENT_IN),temp>maxpoint){
+  maxpoint = temp;
+  }
+  }
+ adcvalue = maxpoint;
+ Voltage = (adcvalue / 1024.0) * 5;
+ float volt_with_offset = float(Voltage)-2.13;
+ float my_value = volt_with_offset/0.066;
+ float temp_check = my_value/sqrt(2);
+ if(temp_check>0){
+  return temp_check;
+ }else{
+  return 0;
+ }
+}
+
+float powerCalculation(float voltageV, float currentA){
+  return abs(voltageV*currentA);
+}
+
+void getdatetime(){
+  now  = RTC.now();
+}
+
+int getyear(){
+  return int(now.year());
+}
+int getmonth(){
+  return int(now.month());
+}
+int getdate(){
+  return int(now.day());
+}
+int gethour(){
+  return int(now.hour());
+}
+int getminute(){
+  return int(now.minute());
+}
+int getsecond(){
+  return int(now.second());
+}
+
+void save_data(float voltage, float current, float power){
+  String datetime_str = getprintdatetime();
+  updatecsv(datetime_str, String(voltage), String(current), String(power));
+}
+
+void updatecsv(String datetime, String voltage, String current, String power){
+  File file;
+  if(is_card_present){
+    digitalWrite(GPIO_PROCESS_STATUS,HIGH);
+    file = SD.open(filename, FILE_WRITE);
+    delay(25);
+    if(!file){
+      Serial.print("Error opening ");
+      Serial.println(filename);
+    }else{
+    String temp = datetime+", "+voltage+", "+current+", "+power;
+    file.println(temp);
+    delay(15);
+    file.close();
+    delay(10);
+  }
+  digitalWrite(GPIO_PROCESS_STATUS,LOW);
+}
+if(is_connected_iot){
+  digitalWrite(GPIO_PROCESS_STATUS,HIGH);
+  String temp = "{\"v\":\"" + voltage + "\",\"a\":\"" + current + "\",\"w\":\""+power+"\"}\n";
+  long iot_delay = 4000;
+  if(push_execution_successful){
+    previousmillis = millis();
+    push_execution_successful = false;
+    IOT_delay(iot_delay);
+    Serial.println("UPDATE TO IOT");
+    iot.println(temp);
+  }
+  if(IOT_delay(iot_delay)){
+    push_execution_successful = true;
+  }else{
+    push_execution_successful = false;
+  }
+  digitalWrite(GPIO_PROCESS_STATUS,LOW);
+}
+}
+
+String getprintdatetime(){
+  getdatetime();
+  String hour = String(gethour());
+  String minute = String(getminute());
+  String seconds = String(getsecond());
+  String date = String(getdate());
+  String month = String(getmonth());
+  String year = String(getyear());
+  String datetime = date+"/"+month+"/"+year+" "+hour+":"+minute+":"+seconds;
+  return datetime;
+}
+
+bool IOT_delay(unsigned long delayy){
+  unsigned long currentmillis = millis();
+  if(currentmillis - previousmillis >= delayy){
+    previousmillis = currentmillis;
+    return true;
+  }
+  return false;
+}

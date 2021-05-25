@@ -1,0 +1,18 @@
+#include <filters.h>
+IIR::ORDER order = IIR::ORDER::OD3;
+
+
+void setup() {
+  Serial.begin(9600);
+  
+}
+const float cutoff_freq = 40.0;
+const float sampling_time = 0.001;
+Filter f(cutoff_freq, sampling_time,order,IIR::TYPE::HIGHPASS);
+void loop() {
+  
+  int value = analogRead(A0);
+  float filteredval = f.filterIn(value);
+  filteredval;
+  delay(1);
+}

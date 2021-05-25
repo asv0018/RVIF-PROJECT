@@ -1,0 +1,37 @@
+//Measuring Current Using ACS712
+ 
+const int analogchannel = A1; //Connect current sensor with A0 of Arduino
+int sensitivity = 66; // use 100 for 20A Module and 66 for 30A Module
+float adcvalue= 0;
+int offsetvalue = 448; 
+float Voltage = 0; //voltage measuring
+float ecurrent = 0;// Current measuring
+ 
+void setup() {
+ //baud rate
+ Serial.begin(9600);//baud rate at which arduino communicates with Laptop/PC
+ // set up the LCD's number of columns and rows:
+ delay(2000);//delay for 2 sec
+}
+ 
+void loop() //method to run the source code repeatedly
+{
+ unsigned int temp=0;
+ float maxpoint = 0;
+ int i=0;
+ for(i=0;i<500;i++)
+ {
+ if(temp = analogRead(analogchannel),temp>maxpoint)
+ {
+ maxpoint = temp;
+ }
+ }
+ adcvalue = maxpoint; 
+ Voltage = (adcvalue / 1024.0) * 5;
+ Serial.println("ADC A "+String(Voltage));
+ float volt_with_offset = float(Voltage)-2.13;
+ Serial.println("ADC B "+String(volt_with_offset));
+ float my_value = volt_with_offset/0.066;
+ Serial.println("ADC Voltage with sensitivity "+String(my_value/1.41));
+ delay(2500); //delay of 2.5 sec
+}

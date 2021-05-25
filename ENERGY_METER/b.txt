@@ -1,0 +1,105 @@
+#include <Adafruit_SSD1306.h>
+#include <SoftwareSerial.h>
+#include <Adafruit_GFX.h>
+#include <DS3231.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <SD.h>
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+#define VOLTAGE_SENSOR_GPIO A0
+#define CURRENT_SENSOR_GPIO A1
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+RTClib RTC;
+DateTime now;
+File file;
+
+String filename = "datalog.csv";
+
+void setup() {
+  Serial.begin(9600);
+  date  = RTC.now();
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)){
+    Serial.println(F("OLED MODULE ALLOCATION FAILED"));
+    for(;;);
+  }
+  Serial.println("INISIALISING...");
+
+  if(!SD.begin()){
+    Serial.println("Card failed, or not present");
+  }
+  Serial.println("Initialised");
+}
+
+void loop() {
+  Serial.println(".");
+  updatecsv("12","22","334","444");
+  delay(1000);
+}
+
+int getyear(){
+  return int(now.year());
+}
+int getmonth(){
+  return int(now.month());
+}
+int getdate(){
+  return int(now.day());
+}
+int gethour(){
+  return int(now.hour());
+}
+int getminute(){
+  return int(now.minute());
+}
+int getsecond(){
+  return int(now.second());
+}
+
+void cleardisplay(){
+  display.clearDisplay();
+}
+
+void displayAs(int s, int x, int y, String toprint){
+  display.setTextSize(s);
+  display.setTextColor(WHITE);
+  display.setCursor(x, y);
+  display.println(toprint);
+}
+
+void showdisplay(){
+  display.display();
+}
+
+void updatecsv(String datetime, String voltage, String current, String power){
+  Serial.println("CHECK");
+  if(!SD.exists(filename)){
+    Serial.println("FIle doesnt exist, creating new");
+    // IF THE FILENAME DOESN'T EXIST, THEN CREATE THE FILE AND PROVIDE THE HEADING
+    file = SD.open(filename, FILE_WRITE);
+    if(!file){
+      Serial.print("Error opening");
+      Serial.println(filename);
+    }else{
+    String temp = "DATE TIME STAMP, VOLTAGE (V), CURRENT (A), POWER (W)";
+    file.println(temp);
+    temp = datetime+", "+voltage+", "+current+", "+power;
+    file.println(temp);
+    file.close();
+  }
+  }else{
+    file = SD.open(filename, FILE_WRITE);
+    if(!file){
+      Serial.print("Error opening");
+      Serial.println(filename);
+    }else{
+    Serial.println("File exist");
+    String temp = datetime+", "+voltage+", "+current+", "+power;
+    file.println(temp);
+    file.close();
+  }
+  }
+
+}
